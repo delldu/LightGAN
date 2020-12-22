@@ -6,6 +6,10 @@
 
 *256x256 flowers after 12 hours of training, 1 gpu*
 
+<img src="./pizza-512.jpg" width="600px"></img>
+
+*Pizza*
+
 ## 'Lightweight' GAN
 
 [![PyPI version](https://badge.fury.io/py/lightweight-gan.svg)](https://badge.fury.io/py/lightweight-gan)
@@ -51,6 +55,88 @@ By default, the augmentation types is set to translation and cutout, with color 
 $ lightweight_gan --data ./path/to/images --aug-prob 0.25 --aug-types [translation,cutout,color]
 ```
 
+### Test augmentation
+
+You can test and see how your images will be augmented before it pass into a neural network (if you use augmentation). Let's see how it works on this image:
+
+![](./docs/aug_test/lena.jpg)
+
+#### Basic usage
+
+Base code to augment your image, define `--aug-test` and put path to your image into `--data`:
+
+```bash
+lightweight_gan \
+    --aug-test \
+    --data ./path/to/lena.jpg
+```
+
+After this will be created the file lena_augs.jpg that will be look something like this:
+
+![](./docs/aug_test/lena_augs_default.jpg)
+
+
+#### Options
+
+You can use some options to change result:
+- `--image-size 256` to change size of image tiles in the result. Default: `256`.
+- `--aug-type [color,cutout,translation]` to combine several augmentations. Default: `[cutout,translation]`.
+- `--batch-size 10` to change count of images in the result image. Default: `10`.
+- `--num-image-tiles 5` to change count of tiles in the result image. Default: `5`.
+
+Try this command:
+```bash
+lightweight_gan \
+    --aug-test \
+    --data ./path/to/lena.jpg \
+    --batch-size 16 \
+    --num-image-tiles 4 \
+    --aug-types [color,translation]
+```
+
+result wil be something like that:
+
+![](./docs/aug_test/lena_augs.jpg)
+
+### Types of augmentations
+
+This library contains several types of embedded augmentations.  
+Some of these works by default, some of these can be controlled from  a command as options in the `--aug-types`:
+- Horizontal flip (work by default, not under control, runs in the AugWrapper class);
+- `color` randomly change brightness, saturation and contrast;
+- `cutout` creates random black boxes on the image; 
+- `offset` randomly moves image by x and y-axis with repeating image;
+  - `offset_x` only by an x-axis;
+  - `offset_y` only by a y-axis;
+- `translation` randomly moves image on the canvas with black background;
+
+Full setup of augmentations is `--aug-types [color,cutout,offset,translation]`.  
+General recommendation is using suitable augs for your data and as many as possible, then after sometime of training disable most destructive (for image) augs.
+
+#### Color
+
+![](./docs/aug_types/lena_augs_color.jpg)
+
+#### Cutout
+
+![](./docs/aug_types/lena_augs_cutout.jpg)
+
+#### Offset
+
+![](./docs/aug_types/lena_augs_offset.jpg)
+
+Only x-axis:
+
+![](./docs/aug_types/lena_augs_offset_h.jpg)
+
+Only y-axis:
+
+![](./docs/aug_types/lena_augs_offset_v.jpg)
+
+#### Translation
+
+![](./docs/aug_types/lena_augs_translation.jpg)
+
 ## Mixed precision
 
 You can turn on automatic mixed precision with one flag `--amp`
@@ -91,6 +177,20 @@ You can add linear + axial attention to specific resolution layers with the foll
 ```bash
 # make sure there are no spaces between the values within the brackets []
 $ lightweight_gan --data ./path/to/images --image-size 512 --attn-res-layers [32,64] --aug-prob 0.25
+```
+
+## Bonus
+
+You can also train with transparent images
+
+```bash
+$ lightweight_gan --data ./path/to/images --transparent
+```
+
+Or greyscale
+
+```bash
+$ lightweight_gan --data ./path/to/images --greyscale
 ```
 
 ## Alternatives
