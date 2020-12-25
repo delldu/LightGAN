@@ -33,16 +33,17 @@ from pytorch_fid import fid_score
 
 from adabelief_pytorch import AdaBelief
 from gsa_pytorch import GSA
-
-from scipy.stats import truncnorm
+# GSA -- Global Self-Attention Networks
 
 # asserts
+
+import pdb
 
 assert torch.cuda.is_available(), 'You need to have an Nvidia GPU with CUDA installed.'
 
 # constants
 
-NUM_CORES = multiprocessing.cpu_count()
+NUM_CORES = multiprocessing.cpu_count()//2
 EXTS = ['jpg', 'jpeg', 'png']
 CALC_FID_NUM_IMAGES = 12800
 
@@ -111,10 +112,6 @@ def slerp(val, low, high):
     so = torch.sin(omega)
     res = (torch.sin((1.0 - val) * omega) / so).unsqueeze(1) * low + (torch.sin(val * omega) / so).unsqueeze(1) * high
     return res
-
-def truncated_normal(size, threshold = 1.5):
-    values = truncnorm.rvs(-threshold, threshold, size = size)
-    return torch.from_numpy(values)
 
 # helper classes
 
@@ -380,6 +377,8 @@ class Generator(nn.Module):
         features = list(map(lambda n: (n[0], min(n[1], fmap_max)), features))
         features = list(map(lambda n: 3 if n[0] >= 8 else n[1], features))
         features = [latent_dim, *features]
+        # (Pdb) features
+        # [64, 512, 512, 256, 128, 64, 32]
 
         in_out_features = list(zip(features[:-1], features[1:]))
 
@@ -433,9 +432,124 @@ class Generator(nn.Module):
 
         self.out_conv = nn.Conv2d(features[-1], init_channel, 3, padding = 1)
 
+        # pdb.set_trace()
+        # (Pdb) a
+        # self = Generator(
+        #   (initial_conv): Sequential(
+        #     (0): ConvTranspose2d(64, 128, kernel_size=(4, 4), stride=(1, 1))
+        #     (1): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        #     (2): GLU(dim=1)
+        #   )
+        #   (layers): ModuleList(
+        #     (0): ModuleList(
+        #       (0): Sequential(
+        #         (0): Upsample(scale_factor=2.0, mode=nearest)
+        #         (1): Identity()
+        #         (2): Conv2d(64, 1024, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        #         (3): BatchNorm2d(1024, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        #         (4): GLU(dim=1)
+        #       )
+        #       (1): None
+        #       (2): None
+        #       (3): None
+        #     )
+        #     (1): ModuleList(
+        #       (0): Sequential(
+        #         (0): Upsample(scale_factor=2.0, mode=nearest)
+        #         (1): Identity()
+        #         (2): Conv2d(512, 1024, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        #         (3): BatchNorm2d(1024, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        #         (4): GLU(dim=1)
+        #       )
+        #       (1): SLE(
+        #         (avg_pool): AdaptiveAvgPool2d(output_size=(4, 4))
+        #         (max_pool): AdaptiveMaxPool2d(output_size=(4, 4))
+        #         (net): Sequential(
+        #           (0): Conv2d(1024, 256, kernel_size=(4, 4), stride=(1, 1))
+        #           (1): LeakyReLU(negative_slope=0.1)
+        #           (2): Conv2d(256, 64, kernel_size=(1, 1), stride=(1, 1))
+        #           (3): Sigmoid()
+        #         )
+        #       )
+        #       (2): None
+        #       (3): None
+        #     )
+        #     (2): ModuleList(
+        #       (0): Sequential(
+        #         (0): Upsample(scale_factor=2.0, mode=nearest)
+        #         (1): Identity()
+        #         (2): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        #         (3): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        #         (4): GLU(dim=1)
+        #       )
+        #       (1): SLE(
+        #         (avg_pool): AdaptiveAvgPool2d(output_size=(4, 4))
+        #         (max_pool): AdaptiveMaxPool2d(output_size=(4, 4))
+        #         (net): Sequential(
+        #           (0): Conv2d(512, 128, kernel_size=(4, 4), stride=(1, 1))
+        #           (1): LeakyReLU(negative_slope=0.1)
+        #           (2): Conv2d(128, 32, kernel_size=(1, 1), stride=(1, 1))
+        #           (3): Sigmoid()
+        #         )
+        #       )
+        #       (2): None
+        #       (3): None
+        #     )
+        #     (3): ModuleList(
+        #       (0): Sequential(
+        #         (0): Upsample(scale_factor=2.0, mode=nearest)
+        #         (1): Identity()
+        #         (2): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        #         (3): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        #         (4): GLU(dim=1)
+        #       )
+        #       (1): None
+        #       (2): None
+        #       (3): Rezero(
+        #         (fn): GSA(
+        #           (to_qkv): Conv2d(256, 1536, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        #           (to_out): Conv2d(512, 256, kernel_size=(1, 1), stride=(1, 1))
+        #         )
+        #       )
+        #     )
+        #     (4): ModuleList(
+        #       (0): Sequential(
+        #         (0): Upsample(scale_factor=2.0, mode=nearest)
+        #         (1): Identity()
+        #         (2): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        #         (3): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        #         (4): GLU(dim=1)
+        #       )
+        #       (1): None
+        #       (2): None
+        #       (3): None
+        #     )
+        #     (5): ModuleList(
+        #       (0): Sequential(
+        #         (0): Upsample(scale_factor=2.0, mode=nearest)
+        #         (1): Identity()
+        #         (2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        #         (3): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        #         (4): GLU(dim=1)
+        #       )
+        #       (1): None
+        #       (2): None
+        #       (3): None
+        #     )
+        #   )
+        #   (out_conv): Conv2d(32, 3, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        # )
+
     def forward(self, x):
+        '''Generator.'''
+
+        # pdb.set_trace()
+        # torch.Size([32, 64])
+        # (Pdb) rearrange(x, 'b c -> b c () ()').size()
+        # torch.Size([32, 64, 1, 1])
         x = rearrange(x, 'b c -> b c () ()')
         x = self.initial_conv(x)
+        # torch.Size([32, 64, 4, 4])
         x = F.normalize(x, dim = 1)
 
         residuals = dict()
@@ -451,17 +565,25 @@ class Generator(nn.Module):
 
             x = up(x)
 
+            # (Pdb) pp sle
+            # None
             if exists(sle):
                 out_res = self.sle_map[res]
                 residual = sle(x)
                 residuals[out_res] = residual
 
             next_res = res + 1
+            # pdb.set_trace()
+
             if next_res in residuals:
                 x = x * residuals[next_res]
 
             if next_res in spatial_residuals:
                 x = x * spatial_residuals[next_res]
+
+        # pdb.set_trace()
+        # (Pdb) self.out_conv(x).size()
+        # torch.Size([32, 3, 256, 256])
 
         return self.out_conv(x)
 
@@ -489,6 +611,32 @@ class SimpleDecoder(nn.Module):
             )
             self.layers.append(layer)
             chans //= 2
+        # pdb.set_trace()
+        # self = SimpleDecoder(
+        #   (layers): ModuleList(
+        #     (0): Sequential(
+        #       (0): Upsample(scale_factor=2.0, mode=nearest)
+        #       (1): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        #       (2): GLU(dim=1)
+        #     )
+        #     (1): Sequential(
+        #       (0): Upsample(scale_factor=2.0, mode=nearest)
+        #       (1): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        #       (2): GLU(dim=1)
+        #     )
+        #     (2): Sequential(
+        #       (0): Upsample(scale_factor=2.0, mode=nearest)
+        #       (1): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        #       (2): GLU(dim=1)
+        #     )
+        #     (3): Sequential(
+        #       (0): Upsample(scale_factor=2.0, mode=nearest)
+        #       (1): Conv2d(64, 6, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        #       (2): GLU(dim=1)
+        #     )
+        #   )
+        # )
+
 
     def forward(self, x):
         for layer in self.layers:
@@ -521,6 +669,7 @@ class Discriminator(nn.Module):
         else:
             init_channel = 3
 
+        # (Pdb) pp resolution -- 8
         num_non_residual_layers = max(0, int(resolution) - 8)
         num_residual_layers = 8 - 3
 
@@ -614,8 +763,184 @@ class Discriminator(nn.Module):
 
         self.decoder1 = SimpleDecoder(chan_in = last_chan, chan_out = init_channel)
         self.decoder2 = SimpleDecoder(chan_in = features[-2][-1], chan_out = init_channel) if resolution >= 9 else None
+        # pdb.set_trace()
+        # (Pdb) a
+        # self = Discriminator(
+        #   (non_residual_layers): ModuleList()
+        #   (residual_layers): ModuleList(
+        #     (0): ModuleList(
+        #       (0): SumBranches(
+        #         (branches): ModuleList(
+        #           (0): Sequential(
+        #             (0): Identity()
+        #             (1): Conv2d(3, 32, kernel_size=(4, 4), stride=(2, 2), padding=(1, 1))
+        #             (2): LeakyReLU(negative_slope=0.1)
+        #             (3): Conv2d(32, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        #             (4): LeakyReLU(negative_slope=0.1)
+        #           )
+        #           (1): Sequential(
+        #             (0): Identity()
+        #             (1): AvgPool2d(kernel_size=2, stride=2, padding=0)
+        #             (2): Conv2d(3, 32, kernel_size=(1, 1), stride=(1, 1))
+        #             (3): LeakyReLU(negative_slope=0.1)
+        #           )
+        #         )
+        #       )
+        #       (1): None
+        #     )
+        #     (1): ModuleList(
+        #       (0): SumBranches(
+        #         (branches): ModuleList(
+        #           (0): Sequential(
+        #             (0): Identity()
+        #             (1): Conv2d(32, 64, kernel_size=(4, 4), stride=(2, 2), padding=(1, 1))
+        #             (2): LeakyReLU(negative_slope=0.1)
+        #             (3): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        #             (4): LeakyReLU(negative_slope=0.1)
+        #           )
+        #           (1): Sequential(
+        #             (0): Identity()
+        #             (1): AvgPool2d(kernel_size=2, stride=2, padding=0)
+        #             (2): Conv2d(32, 64, kernel_size=(1, 1), stride=(1, 1))
+        #             (3): LeakyReLU(negative_slope=0.1)
+        #           )
+        #         )
+        #       )
+        #       (1): None
+        #     )
+        #     (2): ModuleList(
+        #       (0): SumBranches(
+        #         (branches): ModuleList(
+        #           (0): Sequential(
+        #             (0): Identity()
+        #             (1): Conv2d(64, 128, kernel_size=(4, 4), stride=(2, 2), padding=(1, 1))
+        #             (2): LeakyReLU(negative_slope=0.1)
+        #             (3): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        #             (4): LeakyReLU(negative_slope=0.1)
+        #           )
+        #           (1): Sequential(
+        #             (0): Identity()
+        #             (1): AvgPool2d(kernel_size=2, stride=2, padding=0)
+        #             (2): Conv2d(64, 128, kernel_size=(1, 1), stride=(1, 1))
+        #             (3): LeakyReLU(negative_slope=0.1)
+        #           )
+        #         )
+        #       )
+        #       (1): None
+        #     )
+        #     (3): ModuleList(
+        #       (0): SumBranches(
+        #         (branches): ModuleList(
+        #           (0): Sequential(
+        #             (0): Identity()
+        #             (1): Conv2d(128, 256, kernel_size=(4, 4), stride=(2, 2), padding=(1, 1))
+        #             (2): LeakyReLU(negative_slope=0.1)
+        #             (3): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        #             (4): LeakyReLU(negative_slope=0.1)
+        #           )
+        #           (1): Sequential(
+        #             (0): Identity()
+        #             (1): AvgPool2d(kernel_size=2, stride=2, padding=0)
+        #             (2): Conv2d(128, 256, kernel_size=(1, 1), stride=(1, 1))
+        #             (3): LeakyReLU(negative_slope=0.1)
+        #           )
+        #         )
+        #       )
+        #       (1): None
+        #     )
+        #     (4): ModuleList(
+        #       (0): SumBranches(
+        #         (branches): ModuleList(
+        #           (0): Sequential(
+        #             (0): Identity()
+        #             (1): Conv2d(256, 512, kernel_size=(4, 4), stride=(2, 2), padding=(1, 1))
+        #             (2): LeakyReLU(negative_slope=0.1)
+        #             (3): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        #             (4): LeakyReLU(negative_slope=0.1)
+        #           )
+        #           (1): Sequential(
+        #             (0): Identity()
+        #             (1): AvgPool2d(kernel_size=2, stride=2, padding=0)
+        #             (2): Conv2d(256, 512, kernel_size=(1, 1), stride=(1, 1))
+        #             (3): LeakyReLU(negative_slope=0.1)
+        #           )
+        #         )
+        #       )
+        #       (1): None
+        #     )
+        #   )
+        #   (to_logits): Sequential(
+        #     (0): Identity()
+        #     (1): Conv2d(512, 512, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1))
+        #     (2): LeakyReLU(negative_slope=0.1)
+        #     (3): Conv2d(512, 1, kernel_size=(4, 4), stride=(1, 1))
+        #   )
+        #   (to_shape_disc_out): Sequential(
+        #     (0): Conv2d(3, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        #     (1): Residual(
+        #       (fn): Rezero(
+        #         (fn): GSA(
+        #           (to_qkv): Conv2d(64, 1536, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        #           (to_out): Conv2d(512, 64, kernel_size=(1, 1), stride=(1, 1))
+        #         )
+        #       )
+        #     )
+        #     (2): SumBranches(
+        #       (branches): ModuleList(
+        #         (0): Sequential(
+        #           (0): Identity()
+        #           (1): Conv2d(64, 32, kernel_size=(4, 4), stride=(2, 2), padding=(1, 1))
+        #           (2): LeakyReLU(negative_slope=0.1)
+        #           (3): Conv2d(32, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        #           (4): LeakyReLU(negative_slope=0.1)
+        #         )
+        #         (1): Sequential(
+        #           (0): Identity()
+        #           (1): AvgPool2d(kernel_size=2, stride=2, padding=0)
+        #           (2): Conv2d(64, 32, kernel_size=(1, 1), stride=(1, 1))
+        #           (3): LeakyReLU(negative_slope=0.1)
+        #         )
+        #       )
+        #     )
+        #     (3): Residual(
+        #       (fn): Rezero(
+        #         (fn): GSA(
+        #           (to_qkv): Conv2d(32, 1536, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        #           (to_out): Conv2d(512, 32, kernel_size=(1, 1), stride=(1, 1))
+        #         )
+        #       )
+        #     )
+        #     (4): AdaptiveAvgPool2d(output_size=(4, 4))
+        #     (5): Conv2d(32, 1, kernel_size=(4, 4), stride=(1, 1))
+        #   )
+        #   (decoder1): SimpleDecoder(
+        #     (layers): ModuleList(
+        #       (0): Sequential(
+        #         (0): Upsample(scale_factor=2.0, mode=nearest)
+        #         (1): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        #         (2): GLU(dim=1)
+        #       )
+        #       (1): Sequential(
+        #         (0): Upsample(scale_factor=2.0, mode=nearest)
+        #         (1): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        #         (2): GLU(dim=1)
+        #       )
+        #       (2): Sequential(
+        #         (0): Upsample(scale_factor=2.0, mode=nearest)
+        #         (1): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        #         (2): GLU(dim=1)
+        #       )
+        #       (3): Sequential(
+        #         (0): Upsample(scale_factor=2.0, mode=nearest)
+        #         (1): Conv2d(64, 6, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        #         (2): GLU(dim=1)
+        #       )
+        #     )
+        #   )
+        # )
 
     def forward(self, x, calc_aux_loss = False):
+        '''Discriminator.'''
         orig_img = x
 
         for layer in self.non_residual_layers:
@@ -664,6 +989,13 @@ class Discriminator(nn.Module):
 
             aux_loss = aux_loss + aux_loss_16x16
 
+        # pdb.set_trace()
+        # (Pdb) orig_img.size()
+        # torch.Size([32, 3, 256, 256])
+
+        # (Pdb) out.size(), out_32x32.size(), aux_loss.size()
+        # (torch.Size([32, 1]), torch.Size([32, 1, 1, 1]), torch.Size([]))
+
         return out, out_32x32, aux_loss
 
 class LightweightGAN(nn.Module):
@@ -699,7 +1031,16 @@ class LightweightGAN(nn.Module):
             attn_res_layers = attn_res_layers,
             use_sle_spatial = sle_spatial
         )
-
+        # pdb.set_trace()
+        # (Pdb) pp G_kwargs
+        # {'attn_res_layers': [32],
+        #  'fmap_inverse_coef': 12,
+        #  'fmap_max': 512,
+        #  'greyscale': False,
+        #  'image_size': 256,
+        #  'latent_dim': 64,
+        #  'transparent': False,
+        #  'use_sle_spatial': False}
         self.G = Generator(**G_kwargs)
 
         self.D = Discriminator(
@@ -995,6 +1336,12 @@ class Trainer():
             image_batch = next(self.loader).cuda(self.rank)
             image_batch.requires_grad_()
 
+            # pdb.set_trace()
+            # (Pdb) latents.size()
+            # torch.Size([32, 64])
+            # (Pdb) image_batch.size()
+            # torch.Size([32, 3, 256, 256])
+
             with amp_context():
                 with torch.no_grad():
                     generated_images = G(latents)
@@ -1002,6 +1349,10 @@ class Trainer():
                 fake_output, fake_output_32x32, _ = D_aug(generated_images, detach = True, **aug_kwargs)
 
                 real_output, real_output_32x32, real_aux_loss = D_aug(image_batch,  calc_aux_loss = True, **aug_kwargs)
+
+                # pdb.set_trace()
+                # (Pdb) pp generated_images.size()
+                # torch.Size([32, 3, 256, 256])
 
                 real_output_loss = real_output
                 fake_output_loss = fake_output
@@ -1226,7 +1577,7 @@ class Trainer():
         ]
 
         data = [d for d in data if exists(d[1])]
-        log = ' | '.join(map(lambda n: f'{n[0]}: {n[1]:.2f}', data))
+        log = ' | '.join(map(lambda n: f'{n[0]}: {n[1]:.4f}', data))
         print(log)
 
     def model_name(self, num):

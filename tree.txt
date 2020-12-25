@@ -1,0 +1,17 @@
+.
+├── docs
+│   ├── aug_test
+│   └── aug_types
+├── flower_photos
+│   ├── daisy
+│   ├── dandelion
+│   ├── roses
+│   ├── sunflowers
+│   └── tulips
+├── lightweight_gan
+├── models
+│   └── flower
+└── results
+    └── flower
+
+14 directories
